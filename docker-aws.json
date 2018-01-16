@@ -1,0 +1,67 @@
+{
+  "variables": {
+    "aws_default_region": "{{env `AWS_DEFAULT_REGION`}}",
+    "aws_vpc_id": "{{env `AWS_VPC_ID`}}",
+    "aws_subnet_id": "{{env `AWS_SUBNET_ID`}}",
+    "aws_security_group_id": "{{env `AWS_SECURITY_GROUP_ID`}}",
+    "pwd": "{{env `PWD`}}"
+  },
+  "builders": [
+    {
+      "ami_name": "docker {{isotime \"2006-01-02-030405\"}}",
+      "ami_virtualization_type": "hvm",
+      "associate_public_ip_address": "true",
+      "instance_type": "m3.large",
+      "region": "{{user `aws_default_region`}}",
+      "vpc_id": "{{user `aws_vpc_id`}}",
+      "subnet_id": "{{user `aws_subnet_id`}}",
+      "ssh_private_ip": false,
+      "source_ami_filter": {
+        "filters": {
+          "name": "*ubuntu-xenial-16.04-amd64-server-*",
+          "root-device-type": "ebs",
+          "virtualization-type": "hvm"
+        },
+        "most_recent": true
+      },
+      "ssh_username": "ubuntu",
+      "tags": {
+        "OS_Version": "Ubuntu",
+        "Release": "16.04"
+      },
+      "type": "amazon-ebs",
+      "security_group_ids": [ "{{user `aws_security_group_id`}}" ]
+    }
+  ],
+  "post-processors": null,
+  "provisioners": [
+    {
+      "destination": "/tmp/docker.options",
+      "source": "{{user `pwd`}}/docker.options",
+      "type": "file"
+    },
+    {
+      "execute_command": "{{ .Vars }} sudo -E sh '{{ .Path }}'",
+      "inline": [
+        "apt-get update",
+        "apt-get install curl linux-image-extra-$(uname -r) linux-image-extra-virtual",
+        "apt-get install apt-transport-https software-properties-common ca-certificates curl",
+        "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
+        "add-apt-repository \"deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable\"",
+        "apt-get update",
+        "apt-get -y install docker-ce=17.12.0~ce-0~ubuntu python-pip=8.1.1-2ubuntu0.4",
+        "pip install pip --upgrade",
+        "pip install awscli==1.14.24",
+        "mkdir -p /etc/systemd/system/docker.service.d",
+        "mv /tmp/docker.options /etc/systemd/system/docker.service.d/docker.conf",
+        "systemctl enable docker.service",
+        "usermod -aG docker ubuntu",
+        "eval `aws ecr get-login --no-include-email --region us-west-1`",
+        "docker pull apcensionllc/jenkins-master:latest",
+        "docker pull apcensionllc/jenkins-swarm-agent:latest",
+        "docker plugin install rexray/ebs --grant-all-permissions"
+      ],
+      "type": "shell"
+    }
+  ]
+}
