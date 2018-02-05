@@ -20,6 +20,9 @@
         "initrd=/install/initrd.gz -- <enter>"
       ],
       "disk_size": "{{ user `disk_size` }}",
+      "floppy_files": [
+        "http/{{ user `preseed` }}"
+      ],
       "format": "raw",
       "headless": "{{ user `headless` }}",
       "http_directory": "http",
